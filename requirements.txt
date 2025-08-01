@@ -1,0 +1,13 @@
+fastapi
+uvicorn
+langchain>=0.2.0
+langchain-community>=0.0.20
+faiss-cpu
+openai
+tiktoken
+unstructured
+python-dotenv
+pytest
+ollama
+langchain-text-splitters
+pytest-mock
