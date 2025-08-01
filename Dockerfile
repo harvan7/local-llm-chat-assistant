@@ -16,7 +16,7 @@ COPY ./data /app/data
 
 # Crea el almacén de vectores. 
 # Esto asegura que el índice FAISS esté disponible cuando se inicie el contenedor.
-RUN python -c "from app.rag_engine import embed_and_store; embed_and_store()"
+# RUN python -c "from app.rag_engine import embed_and_store; embed_and_store()"
 
 # Expone el puerto 8000 para que la API sea accesible
 EXPOSE 8000
