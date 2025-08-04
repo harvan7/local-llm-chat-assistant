@@ -5,6 +5,7 @@ from langchain_community.vectorstores import FAISS
 # from langchain_community.llms import Ollama
 from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
 from langchain.chains import RetrievalQA
+from langchain.prompts import ChatPromptTemplate, SystemMessagePromptTemplate
 import os
 from dotenv import load_dotenv
 
@@ -45,7 +46,25 @@ def get_rag_chain():
     # llm = Ollama(model="llama3:8b")
     # Gemini LLM
     llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash-latest")
-    return RetrievalQA.from_chain_type(llm=llm, retriever=retriever)
+
+    # Create a system message to ensure Spanish responses
+    system_message_prompt = SystemMessagePromptTemplate.from_template(
+        "Eres un asistente de IA especializado en finanzas personales. Responde siempre en español."
+    )
+    
+    # Create a chat prompt template
+    chat_prompt_template = ChatPromptTemplate.from_messages([
+        system_message_prompt,
+        ("{context}", "user"), # Context from retriever
+        ("{query}", "user") # User's query
+    ])
+
+    return RetrievalQA.from_chain_type(
+        llm=llm,
+        retriever=retriever,
+        chain_type="stuff", # "stuff" is common for RAG with a single prompt
+        chain_type_kwargs={"prompt": chat_prompt_template}
+    )
 
 def answer_question(query: str):
     # Ollama LLM
@@ -60,8 +79,9 @@ def answer_question(query: str):
 
     # Use LLM to determine if the query is within the scope of personal finance
     # If not, the LLM will try to answer generally or redirect.
-    llm_response_prompt = f'''Eres un asistente de IA especializado en finanzas personales.
-Si la siguiente pregunta está directamente relacionada con finanzas personales (ahorro, presupuesto, inversión, deuda, crédito, etc.), responde a la pregunta utilizando tu conocimiento.
+    llm_response_prompt = f'''Eres un asistente de IA especializado en finanzas personales. Responde siempre en español.
+Si la siguiente pregunta está directamente relacionada con finanzas personales (ahorro, presupuesto, inversión, deuda, crédito, etc.), responde a la pregunta utilizando tu conocimiento y los documentos proporcionados.
+Si la pregunta incluye cálculos numéricos específicos o requiere un plan financiero personalizado (ej. "tengo una deuda X a interes del x% quiero disminuirla con ingresos de Y mensuales"), explica los conceptos financieros relevantes (ej. métodos de reducción de deuda como bola de nieve o avalancha) y sugiere al usuario que utilice una calculadora financiera o consulte a un profesional para obtener cifras exactas y un plan adaptado a su situación.
 Si la pregunta es una consulta general, una pregunta sobre ti mismo, o una conversación casual, responde de forma natural y amigable.
 Si la pregunta no es de finanzas personales y no puedes responderla de forma general, o si es una pregunta que requiere información específica que no tienes, redirige amablemente al usuario a temas de finanzas personales.
 
