@@ -18,13 +18,7 @@ jobs:
       - name: Install Azure Developer CLI
         run: curl -fsSL https://aka.ms/install-azd.sh | bash
 
-      # 3. Login a Azure con Service Principal
-      - name: Azure Login
-        uses: azure/login@v1
-        with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
-
-      # 4. Login a Azure Container Registry
+      # 3. Login a Azure Container Registry (ACR)
       - name: Login to Azure Container Registry
         uses: docker/login-action@v2
         with:
@@ -32,13 +26,21 @@ jobs:
           password: ${{ secrets.AZURE_PASSWORD }}
           registry: ragfinanzasper.azurecr.io
 
-      # 5. Build Docker Image
+      # 4. Build Docker Image
       - name: Build Docker image
         run: |
           IMAGE_NAME=ragfinanzasper.azurecr.io/wealthadvisor:latest
           docker build -t $IMAGE_NAME .
           echo "IMAGE_NAME=$IMAGE_NAME" >> $GITHUB_ENV
 
-      # 6. Push Docker Image
+      # 5. Push Docker Image
       - name: Push Docker image
-        run: docker push $IMAGE_NA_
+        run: docker push $IMAGE_NAME
+
+      # 6. Deploy a Azure Container Apps
+      - name: Deploy to Azure Container Apps
+        run: azd deploy --no-prompt
+        env:
+          API_KEY: ${{ secrets.API_KEY }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          IMAGE_NAME: ${{ env.IMAGE_NAME }}
