@@ -1,5 +1,6 @@
-from fastapi import FastAPI, HTTPException, Request, Depends
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from app.rag_engine import answer_question
 import os
@@ -9,6 +10,19 @@ load_dotenv()
 
 app = FastAPI()
 security = HTTPBearer()
+
+# --- Configuración de CORS ---
+origins = [
+    "http://localhost:3000"  # Permite el frontend en desarrollo
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],  # Permite GET, POST, etc.
+    allow_headers=["*"],  # Permite headers como Authorization
+)
 
 def get_api_key():
     return os.getenv("API_KEY")
