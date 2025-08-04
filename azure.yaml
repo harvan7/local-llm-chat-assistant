@@ -6,8 +6,8 @@ services:
       dockerfile: Dockerfile
     env:
       - name: API_KEY
-        value: API_KEY=CLAVE_API_TEAM8_070401082025?
+        value: ${API_KEY}
       - name: GOOGLE_API_KEY
-        value: YOUR_GOOGLE_API_KEY_HERE
+        value: ${GOOGLE_API_KEY}
     ports:
       - 8000
