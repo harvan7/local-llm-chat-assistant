@@ -7,5 +7,7 @@ services:
     env:
       - name: API_KEY
         value: API_KEY=CLAVE_API_TEAM8_070401082025?
+      - name: GOOGLE_API_KEY
+        value: YOUR_GOOGLE_API_KEY_HERE
     ports:
       - 8000
