@@ -1,7 +1,7 @@
 version: 1.0
 services:
   web:
-    image: <tu_usuario>/rag-finanzas:latest
+    image: ${IMAGE_NAME}
     build:
       dockerfile: Dockerfile
     env:
