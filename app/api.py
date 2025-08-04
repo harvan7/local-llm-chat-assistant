@@ -24,3 +24,13 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security), 
 def ask_question(q: Question, creds: HTTPAuthorizationCredentials = Depends(verify_token)):
     response = answer_question(q.query)
     return {"response": response}
+
+# Nueva ruta raíz para pruebas y monitoreo
+@app.get("/")
+def root():
+    return {"message": "WealthAdvisor is running"}
+
+# Ruta opcional para evitar el 404 en robots933456.txt
+@app.get("/robots933456.txt")
+def robots():
+    return ""
