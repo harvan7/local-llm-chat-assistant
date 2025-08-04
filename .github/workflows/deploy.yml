@@ -21,6 +21,6 @@ jobs:
 
       - name: Build and Push Docker image
         run: |
-          IMAGE_NAME=ragfinanzasper.azurecr.io/wealthadvisor:latest
+          IMAGE_NAME=ragfinanzasper.azurecr.io/local-llm-chat-assistant:latest
           docker build -t $IMAGE_NAME .
           docker push $IMAGE_NAME
