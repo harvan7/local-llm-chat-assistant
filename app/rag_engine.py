@@ -27,14 +27,18 @@ def get_vectorstore():
 
 # --- Definir el prompt ---
 def get_prompt():
+    """
+    Combina las instrucciones del sistema y el contexto.
+    El contexto se incluye dentro del mensaje del sistema para evitar errores de roles.
+    """
     return ChatPromptTemplate.from_messages([
         SystemMessagePromptTemplate.from_template(
             "Eres un asistente especializado en **finanzas personales**. "
             "Responde SIEMPRE en español de manera clara y concisa. "
             "Si la pregunta no está relacionada con finanzas personales, responde brevemente "
-            "que tu especialidad son las finanzas personales."
+            "que tu especialidad son las finanzas personales.\n\n"
+            "Contexto relevante:\n{context}"
         ),
-        ("human", "{context}"),
         ("human", "{question}")
     ])
 
@@ -76,13 +80,16 @@ def answer_question(question: str, chat_history: list):
         elif msg["type"] in ["ai", "assistant"]:
             formatted_history.append(AIMessage(content=msg["content"]))
 
+    # Combinar historial en un contexto de texto
+    history_text = "\n".join([f"{m.type}: {m.content}" for m in formatted_history]) or "No hay historial previo."
+
     # Crear la cadena RAG
     rag_chain = get_rag_chain()
 
     # Ejecutar la consulta
     result = rag_chain({
         "question": question,
-        "context": "\n".join([f"{m.type}: {m.content}" for m in formatted_history])
+        "context": history_text
     })
 
-    return result["answer"] if "answer" in result else result
+    return result.get("answer", result)
