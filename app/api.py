@@ -2,6 +2,8 @@ from fastapi import FastAPI, HTTPException, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from typing import List, Union
+from langchain_core.messages import HumanMessage, AIMessage
 from app.rag_engine import answer_question
 import os
 from dotenv import load_dotenv
@@ -28,6 +30,7 @@ def get_api_key():
 
 class Question(BaseModel):
     query: str
+    chat_history: List[Union[HumanMessage, AIMessage]] = []
 
 def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security), api_key: str = Depends(get_api_key)):
     if credentials.credentials != api_key:
@@ -35,7 +38,7 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security), 
 
 @app.post("/ask")
 def ask_question(q: Question, creds: HTTPAuthorizationCredentials = Depends(verify_token)):
-    response = answer_question(q.query)
+    response = answer_question(q.query, q.chat_history)
     return {"response": response}
 
 @app.get("/")
