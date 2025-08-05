@@ -7,12 +7,13 @@ from app.rag_engine import answer_question
 import os
 from dotenv import load_dotenv
 
+# --- Cargar variables de entorno ---
 load_dotenv()
 
 app = FastAPI()
 
-# --- CORS ---
-origins = ["http://localhost:3000"]
+# --- Configuración CORS ---
+origins = ["http://localhost:3000"]  # Ajusta según tu frontend
 
 app.add_middleware(
     CORSMiddleware,
@@ -22,30 +23,42 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# --- Seguridad ---
 security = HTTPBearer()
 
 def get_api_key():
-    return os.getenv("API_KEY")
+    api_key = os.getenv("API_KEY")
+    if not api_key:
+        raise ValueError("La variable API_KEY no está configurada.")
+    return api_key
 
-# --- Request Model ---
+# --- Modelos de datos ---
 class ChatMessage(BaseModel):
-    type: str  # "human" or "ai"
+    type: str  # "human" o "ai"
     content: str
 
 class Question(BaseModel):
     query: str
     chat_history: List[ChatMessage] = []
 
-# --- Auth ---
+# --- Autenticación ---
 def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security), api_key: str = Depends(get_api_key)):
     if credentials.credentials != api_key:
         raise HTTPException(status_code=403, detail="Token inválido")
+    return True
 
 # --- Endpoints ---
 @app.post("/ask")
-def ask_question(q: Question, creds: HTTPAuthorizationCredentials = Depends(verify_token)):
-    chat_history_dicts = [msg.dict() for msg in q.chat_history]  # Convert Pydantic to dict
+def ask_question(q: Question, creds: bool = Depends(verify_token)):
+    """
+    Endpoint principal para hacer preguntas al sistema RAG con Gemini.
+    """
+    # Convertir historial de Pydantic a lista de dicts
+    chat_history_dicts = [msg.dict() for msg in q.chat_history]
+
+    # Obtener respuesta del motor RAG
     response = answer_question(q.query, chat_history_dicts)
+
     return {"response": response}
 
 @app.get("/")
