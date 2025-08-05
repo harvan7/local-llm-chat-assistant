@@ -1,15 +1,15 @@
 from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
+from langchain_community.vectorstores import FAISS
 from langchain.prompts import ChatPromptTemplate, SystemMessagePromptTemplate
 from langchain.memory import ConversationBufferMemory
 from langchain.chains import ConversationalRetrievalChain
-from langchain.vectorstores import FAISS
 from langchain.schema import HumanMessage, AIMessage
 import os
 
 # --- Cargar variables de entorno ---
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-if not GEMINI_API_KEY:
-    raise ValueError("La variable GEMINI_API_KEY no está configurada.")
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+if not GOOGLE_API_KEY:
+    raise ValueError("La variable GOOGLE_API_KEY no está configurada.")
 
 # --- Inicializar modelo ---
 def get_llm():
@@ -59,11 +59,6 @@ def get_rag_chain():
 
 # --- Función principal ---
 def answer_question(question: str, chat_history: list):
-    """
-    question: Pregunta actual del usuario
-    chat_history: Lista de mensajes previos con formato:
-        [{"type": "human", "content": "texto"}, {"type": "ai", "content": "respuesta"}]
-    """
     formatted_history = []
     for msg in chat_history:
         if msg["type"] == "human":
