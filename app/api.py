@@ -12,9 +12,8 @@ load_dotenv()
 
 app = FastAPI()
 
-# --- Configuración CORS ---
-origins = ["http://localhost:3000"]  # Ajusta según tu frontend
-
+# --- CORS ---
+origins = ["http://localhost:3000"]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -27,10 +26,7 @@ app.add_middleware(
 security = HTTPBearer()
 
 def get_api_key():
-    api_key = os.getenv("API_KEY")
-    if not api_key:
-        raise ValueError("La variable API_KEY no está configurada.")
-    return api_key
+    return os.getenv("API_KEY")
 
 # --- Modelos de datos ---
 class ChatMessage(BaseModel):
@@ -45,20 +41,12 @@ class Question(BaseModel):
 def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security), api_key: str = Depends(get_api_key)):
     if credentials.credentials != api_key:
         raise HTTPException(status_code=403, detail="Token inválido")
-    return True
 
 # --- Endpoints ---
 @app.post("/ask")
-def ask_question(q: Question, creds: bool = Depends(verify_token)):
-    """
-    Endpoint principal para hacer preguntas al sistema RAG con Gemini.
-    """
-    # Convertir historial de Pydantic a lista de dicts
+def ask_question(q: Question, creds: HTTPAuthorizationCredentials = Depends(verify_token)):
     chat_history_dicts = [msg.dict() for msg in q.chat_history]
-
-    # Obtener respuesta del motor RAG
     response = answer_question(q.query, chat_history_dicts)
-
     return {"response": response}
 
 @app.get("/")
