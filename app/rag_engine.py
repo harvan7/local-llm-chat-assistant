@@ -1,7 +1,6 @@
 from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
 from langchain_community.vectorstores import FAISS
 from langchain.prompts import ChatPromptTemplate, SystemMessagePromptTemplate
-from langchain.memory import ConversationBufferMemory
 from langchain.chains import ConversationalRetrievalChain
 from langchain.schema import HumanMessage, AIMessage
 import os
@@ -30,11 +29,12 @@ def get_prompt():
         SystemMessagePromptTemplate.from_template(
             "Eres un asistente especializado en **finanzas personales**. "
             "Responde SIEMPRE en español de manera clara y concisa. "
-            "Si la pregunta no está relacionada con finanzas personales, responde brevemente "
-            "que tu especialidad son las finanzas personales."
+            "Si la pregunta no está relacionada con finanzas personales, "
+            "responde brevemente que tu especialidad son las finanzas personales."
         ),
-        ("human", "{context}"),
-        ("human", "{question}")
+        ("human", "Historial del chat (si existe): {chat_history}"),
+        ("human", "Contexto relevante:\n{context}"),
+        ("human", "Pregunta:\n{question}")
     ])
 
 # --- Crear la cadena RAG ---
@@ -45,32 +45,29 @@ def get_rag_chain():
 
     prompt = get_prompt()
 
-    memory = ConversationBufferMemory(
-        memory_key="chat_history",
-        return_messages=True
-    )
-
     return ConversationalRetrievalChain.from_llm(
         llm=llm,
         retriever=retriever,
-        memory=memory,
-        combine_docs_chain_kwargs={"prompt": prompt}
+        combine_docs_chain_kwargs={"prompt": prompt},
+        return_source_documents=False
     )
 
 # --- Función principal ---
-def answer_question(question: str, chat_history: list):
+def answer_question(question: str, chat_history: list = None):
+    # Formatear historial para ConversationalRetrievalChain
     formatted_history = []
-    for msg in chat_history:
-        if msg["type"] == "human":
-            formatted_history.append(HumanMessage(content=msg["content"]))
-        elif msg["type"] in ["ai", "assistant"]:
-            formatted_history.append(AIMessage(content=msg["content"]))
+    if chat_history:
+        for msg in chat_history:
+            if msg["type"] == "human":
+                formatted_history.append(HumanMessage(content=msg["content"]))
+            elif msg["type"] in ["ai", "assistant"]:
+                formatted_history.append(AIMessage(content=msg["content"]))
 
     rag_chain = get_rag_chain()
 
     result = rag_chain({
         "question": question,
-        "context": "\n".join([f"{m.type}: {m.content}" for m in formatted_history])
+        "chat_history": formatted_history
     })
 
     return result["answer"] if "answer" in result else result
