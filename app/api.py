@@ -9,20 +9,19 @@ from dotenv import load_dotenv
 load_dotenv()
 
 app = FastAPI()
-security = HTTPBearer()
 
 # --- Configuración de CORS ---
-origins = [
-    "http://localhost:3000"  # Permite el frontend en desarrollo
-]
+origins = ["http://localhost:3000"]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["*"],  # Permite GET, POST, etc.
-    allow_headers=["*"],  # Permite headers como Authorization
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
+
+security = HTTPBearer()
 
 def get_api_key():
     return os.getenv("API_KEY")
@@ -39,12 +38,10 @@ def ask_question(q: Question, creds: HTTPAuthorizationCredentials = Depends(veri
     response = answer_question(q.query)
     return {"response": response}
 
-# Nueva ruta raíz para pruebas y monitoreo
 @app.get("/")
 def root():
     return {"message": "WealthAdvisor is running"}
 
-# Ruta opcional para evitar el 404 en robots933456.txt
 @app.get("/robots933456.txt")
 def robots():
     return ""
