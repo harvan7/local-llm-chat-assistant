@@ -1,9 +1,9 @@
-from langchain.chat_models import ChatGoogleGenerativeAI
+from langchain_community.chat_models import ChatGoogleGenerativeAI
+from langchain_community.embeddings import GoogleGenerativeAIEmbeddings
 from langchain.prompts import ChatPromptTemplate, SystemMessagePromptTemplate
 from langchain.memory import ConversationBufferMemory
 from langchain.chains import ConversationalRetrievalChain
 from langchain.vectorstores import FAISS
-from langchain.embeddings import GoogleGenerativeAIEmbeddings
 from langchain.schema import HumanMessage, AIMessage
 import os
 
@@ -23,22 +23,18 @@ def get_llm():
 # --- Inicializar embeddings y vectorstore ---
 def get_vectorstore():
     embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
-    return FAISS.load_local("faiss_index", embeddings)
+    return FAISS.load_local("faiss_index", embeddings, allow_dangerous_deserialization=True)
 
 # --- Definir el prompt ---
 def get_prompt():
-    """
-    Combina las instrucciones del sistema y el contexto.
-    El contexto se incluye dentro del mensaje del sistema para evitar errores de roles.
-    """
     return ChatPromptTemplate.from_messages([
         SystemMessagePromptTemplate.from_template(
             "Eres un asistente especializado en **finanzas personales**. "
             "Responde SIEMPRE en español de manera clara y concisa. "
             "Si la pregunta no está relacionada con finanzas personales, responde brevemente "
-            "que tu especialidad son las finanzas personales.\n\n"
-            "Contexto relevante:\n{context}"
+            "que tu especialidad son las finanzas personales."
         ),
+        ("human", "{context}"),
         ("human", "{question}")
     ])
 
@@ -80,16 +76,13 @@ def answer_question(question: str, chat_history: list):
         elif msg["type"] in ["ai", "assistant"]:
             formatted_history.append(AIMessage(content=msg["content"]))
 
-    # Combinar historial en un contexto de texto
-    history_text = "\n".join([f"{m.type}: {m.content}" for m in formatted_history]) or "No hay historial previo."
-
     # Crear la cadena RAG
     rag_chain = get_rag_chain()
 
     # Ejecutar la consulta
     result = rag_chain({
         "question": question,
-        "context": history_text
+        "context": "\n".join([f"{m.type}: {m.content}" for m in formatted_history])
     })
 
-    return result.get("answer", result)
+    return result["answer"] if "answer" in result else result
