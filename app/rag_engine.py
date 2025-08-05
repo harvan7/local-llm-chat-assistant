@@ -1,99 +1,88 @@
-from langchain_community.document_loaders import TextLoader
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_community.vectorstores import FAISS
-from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
-from langchain.chains import ConversationalRetrievalChain
-from langchain.memory import ConversationBufferMemory
+from langchain.chat_models import ChatGoogleGenerativeAI
 from langchain.prompts import ChatPromptTemplate, SystemMessagePromptTemplate
-from langchain_core.messages import HumanMessage, AIMessage
+from langchain.memory import ConversationBufferMemory
+from langchain.chains import ConversationalRetrievalChain
+from langchain.vectorstores import FAISS
+from langchain.embeddings import GoogleGenerativeAIEmbeddings
+from langchain.schema import HumanMessage, AIMessage
 import os
-from dotenv import load_dotenv
 
-load_dotenv()
+# --- Cargar variables de entorno ---
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+if not GEMINI_API_KEY:
+    raise ValueError("La variable GEMINI_API_KEY no está configurada.")
 
-# --- Configuración de rutas y API Key ---
-os.environ["GOOGLE_API_KEY"] = os.getenv("GOOGLE_API_KEY")
-DATA_PATH = "data/Finanzas_Personales_Data.txt"
-DB_PATH = "faiss_index"
+# --- Inicializar modelo ---
+def get_llm():
+    return ChatGoogleGenerativeAI(
+        model="gemini-1.5-flash",
+        temperature=0.3,
+        max_output_tokens=512
+    )
 
-# --- Cargar y dividir documentos ---
-def load_documents():
-    loader = TextLoader(DATA_PATH)
-    docs = loader.load()
-    splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
-    return splitter.split_documents(docs)
-
-# --- Generar embeddings y almacenar en FAISS ---
-def embed_and_store():
-    docs = load_documents()
+# --- Inicializar embeddings y vectorstore ---
+def get_vectorstore():
     embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
-    db = FAISS.from_documents(docs, embeddings)
-    db.save_local(DB_PATH)
+    return FAISS.load_local("faiss_index", embeddings)
 
-# --- Cargar base vectorial ---
-def load_vector_db():
-    embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
-    return FAISS.load_local(DB_PATH, embeddings, allow_dangerous_deserialization=True)
+# --- Definir el prompt ---
+def get_prompt():
+    return ChatPromptTemplate.from_messages([
+        SystemMessagePromptTemplate.from_template(
+            "Eres un asistente especializado en **finanzas personales**. "
+            "Responde SIEMPRE en español de manera clara y concisa. "
+            "Si la pregunta no está relacionada con finanzas personales, responde brevemente "
+            "que tu especialidad son las finanzas personales."
+        ),
+        ("human", "{context}"),
+        ("human", "{question}")
+    ])
 
-# --- Construir RAG Chain ---
-def get_rag_chain(chat_history=None):
-    db = load_vector_db()
-    retriever = db.as_retriever()
-    llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash-latest")
+# --- Crear la cadena RAG ---
+def get_rag_chain():
+    llm = get_llm()
+    vectorstore = get_vectorstore()
+    retriever = vectorstore.as_retriever(search_kwargs={"k": 3})
 
-    # Convertir el chat_history en formato LangChain
-    formatted_history = []
-    if chat_history:
-        for msg in chat_history:
-            if msg["type"] == "human":
-                formatted_history.append(HumanMessage(content=msg["content"]))
-            elif msg["type"] == "ai":
-                formatted_history.append(AIMessage(content=msg["content"]))
+    prompt = get_prompt()
 
-    memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
-    memory.chat_memory.messages = formatted_history
+    # Memoria de conversación
+    memory = ConversationBufferMemory(
+        memory_key="chat_history",
+        return_messages=True
+    )
 
-    qa_chain = ConversationalRetrievalChain.from_llm(
+    # Cadena RAG
+    return ConversationalRetrievalChain.from_llm(
         llm=llm,
         retriever=retriever,
         memory=memory,
-        combine_docs_chain_kwargs={
-            "prompt": ChatPromptTemplate.from_messages([
-                SystemMessagePromptTemplate.from_template(
-                    "Eres un asistente de IA especializado en finanzas personales. Responde siempre en español."
-                ),
-                ("user", "{context}"),
-                ("user", "{question}")
-            ])
-        }
+        combine_docs_chain_kwargs={"prompt": prompt}
     )
-    return qa_chain
 
-# --- Responder preguntas ---
-def answer_question(query: str, chat_history: list = []):
-    llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash-latest")
+# --- Función principal ---
+def answer_question(question: str, chat_history: list):
+    """
+    question: Pregunta actual del usuario
+    chat_history: Lista de mensajes previos con formato:
+        [{"type": "human", "content": "texto"}, {"type": "ai", "content": "respuesta"}]
+    """
 
-    lower_query = query.lower()
-    if any(greeting in lower_query for greeting in ["hola", "como estas", "qué tal", "buenos días", "buenas tardes", "buenas noches"]):
-        return "¡Hola! Estoy aquí para ayudarte con tus preguntas sobre finanzas personales. ¿En qué puedo asistirte hoy?"
+    # Convertir historial a formato LangChain
+    formatted_history = []
+    for msg in chat_history:
+        if msg["type"] == "human":
+            formatted_history.append(HumanMessage(content=msg["content"]))
+        elif msg["type"] in ["ai", "assistant"]:
+            formatted_history.append(AIMessage(content=msg["content"]))
 
-    llm_response_prompt = f'''Eres un asistente de IA especializado en finanzas personales. Responde siempre en español.
-Si la siguiente pregunta está directamente relacionada con finanzas personales (ahorro, presupuesto, inversión, deuda, crédito, etc.), responde a la pregunta utilizando tu conocimiento y los documentos proporcionados.
-Si la pregunta incluye cálculos numéricos específicos o requiere un plan financiero personalizado (ej. "tengo una deuda X a interes del x% quiero disminuirla con ingresos de Y mensuales"), explica los conceptos financieros relevantes (ej. métodos de reducción de deuda como bola de nieve o avalancha) y sugiere al usuario que utilice una calculadora financiera o consulte a un profesional para obtener cifras exactas y un plan adaptado a su situación.
-Si la pregunta es una consulta general, una pregunta sobre ti mismo, o una conversación casual, responde de forma natural y amigable.
-Si la pregunta no es de finanzas personales y no puedes responderla de forma general, o si es una pregunta que requiere información específica que no tienes, redirige amablemente al usuario a temas de finanzas personales.
+    # Crear la cadena RAG
+    rag_chain = get_rag_chain()
 
-Pregunta: '{query}'
-'''
-    llm_general_response = llm.invoke(llm_response_prompt).content.strip()
+    # Ejecutar la consulta
+    result = rag_chain({
+        "question": question,
+        "context": "\n".join([f"{m.type}: {m.content}" for m in formatted_history])
+    })
 
-    if "finanzas personales" in llm_general_response.lower() or "puedo ayudarte con" in llm_general_response.lower():
-        return llm_general_response
-
-    rag_chain = get_rag_chain(chat_history)
-    rag_answer = rag_chain.invoke({"question": query, "chat_history": chat_history})
-
-    if rag_answer and "no tengo información" not in rag_answer['answer'].lower() and "no sé" not in rag_answer['answer'].lower():
-        return rag_answer['answer']
-    else:
-        return llm_general_response
+    return result["answer"] if "answer" in result else result
