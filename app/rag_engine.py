@@ -4,7 +4,8 @@ from langchain_community.vectorstores import FAISS
 # from langchain_community.embeddings import OllamaEmbeddings
 # from langchain_community.llms import Ollama
 from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
-from langchain.chains import RetrievalQA
+from langchain.chains import ConversationalRetrievalChain
+from langchain.memory import ConversationBufferMemory
 from langchain.prompts import ChatPromptTemplate, SystemMessagePromptTemplate
 import os
 from dotenv import load_dotenv
@@ -42,34 +43,32 @@ def load_vector_db():
 def get_rag_chain():
     db = load_vector_db()
     retriever = db.as_retriever()
-    # Ollama LLM
-    # llm = Ollama(model="llama3:8b")
-    # Gemini LLM
     llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash-latest")
 
-    # Create a system message to ensure Spanish responses
-    system_message_prompt = SystemMessagePromptTemplate.from_template(
-        "Eres un asistente de IA especializado en finanzas personales. Responde siempre en español."
-    )
-    
-    # Create a chat prompt template
-    chat_prompt_template = ChatPromptTemplate.from_messages([
-        system_message_prompt,
-        ("{context}", "user"), # Context from retriever
-        ("{query}", "user") # User's query
-    ])
+    # Memory for conversational context
+    memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
 
-    return RetrievalQA.from_chain_type(
+    # ConversationalRetrievalChain handles chat history and question rephrasing
+    # The system message for Spanish responses will be part of the overall prompt
+    # within the ConversationalRetrievalChain's question generator.
+    qa_chain = ConversationalRetrievalChain.from_llm(
         llm=llm,
         retriever=retriever,
-        chain_type="stuff", # "stuff" is common for RAG with a single prompt
-        chain_type_kwargs={"prompt": chat_prompt_template}
+        memory=memory,
+        # This part is crucial for ensuring the question generator also respects Spanish
+        combine_docs_chain_kwargs={
+            "prompt": ChatPromptTemplate.from_messages([
+                SystemMessagePromptTemplate.from_template(
+                    "Eres un asistente de IA especializado en finanzas personales. Responde siempre en español."
+                ),
+                ("{context}", "user"),
+                ("{question}", "user")
+            ])
+        }
     )
+    return qa_chain
 
-def answer_question(query: str):
-    # Ollama LLM
-    # llm = Ollama(model="llama3:8b") # Initialize LLM for scope check
-    # Gemini LLM
+def answer_question(query: str, chat_history: list = []):
     llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash-latest")
 
     # Check for common greetings
@@ -101,11 +100,11 @@ Pregunta: '{query}'
     # This assumes the LLM's general response was not a definitive answer
     # and the query might still be financial.
     rag_chain = get_rag_chain()
-    rag_answer = rag_chain.invoke({"query": query})
+    rag_answer = rag_chain.invoke({"question": query, "chat_history": chat_history})
     
     # If RAG provides a meaningful answer, return it.
     # Otherwise, return the LLM's general response (which might be a polite "I can't help with that").
-    if rag_answer and "no tengo información" not in rag_answer['result'].lower() and "no sé" not in rag_answer['result'].lower():
-        return rag_answer['result']
+    if rag_answer and "no tengo información" not in rag_answer['answer'].lower() and "no sé" not in rag_answer['answer'].lower():
+        return rag_answer['answer']
     else:
         return llm_general_response
