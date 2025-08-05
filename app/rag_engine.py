@@ -1,5 +1,4 @@
-from langchain_community.chat_models import ChatGoogleGenerativeAI
-from langchain_community.embeddings import GoogleGenerativeAIEmbeddings
+from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
 from langchain.prompts import ChatPromptTemplate, SystemMessagePromptTemplate
 from langchain.memory import ConversationBufferMemory
 from langchain.chains import ConversationalRetrievalChain
@@ -46,13 +45,11 @@ def get_rag_chain():
 
     prompt = get_prompt()
 
-    # Memoria de conversación
     memory = ConversationBufferMemory(
         memory_key="chat_history",
         return_messages=True
     )
 
-    # Cadena RAG
     return ConversationalRetrievalChain.from_llm(
         llm=llm,
         retriever=retriever,
@@ -67,8 +64,6 @@ def answer_question(question: str, chat_history: list):
     chat_history: Lista de mensajes previos con formato:
         [{"type": "human", "content": "texto"}, {"type": "ai", "content": "respuesta"}]
     """
-
-    # Convertir historial a formato LangChain
     formatted_history = []
     for msg in chat_history:
         if msg["type"] == "human":
@@ -76,10 +71,8 @@ def answer_question(question: str, chat_history: list):
         elif msg["type"] in ["ai", "assistant"]:
             formatted_history.append(AIMessage(content=msg["content"]))
 
-    # Crear la cadena RAG
     rag_chain = get_rag_chain()
 
-    # Ejecutar la consulta
     result = rag_chain({
         "question": question,
         "context": "\n".join([f"{m.type}: {m.content}" for m in formatted_history])
