@@ -13,7 +13,7 @@ if not GOOGLE_API_KEY:
 # --- Inicializar modelo ---
 def get_llm():
     return ChatGoogleGenerativeAI(
-        model="gemini-1.5-flash",
+        model="gemini-2.5-flash-lite", #"gemini-1.5-flash",
         temperature=0.3,
         max_output_tokens=512
     )
