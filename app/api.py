@@ -13,7 +13,7 @@ load_dotenv()
 app = FastAPI()
 
 # --- CORS ---
-origins = ["http://localhost:3000"]
+origins = ["http://localhost:3000", "https://finance-chatbot-eight.vercel.app"]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
