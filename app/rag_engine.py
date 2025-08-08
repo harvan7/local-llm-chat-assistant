@@ -58,11 +58,19 @@ def get_rag_chain():
     )
 
 # --- Función principal ---
-def answer_question(question: str, chat_history: list = None):
+def answer_question(question: str, chat_history: list = None, max_turns: int = 5):
+    """
+    :param question: Pregunta actual del usuario
+    :param chat_history: Lista de mensajes anteriores, cada uno con {"type": "human"/"ai", "content": "..."}
+    :param max_turns: Número máximo de interacciones (pares human + ai) a conservar
+    """
     # Formatear historial para ConversationalRetrievalChain
     formatted_history = []
     if chat_history:
-        for msg in chat_history:
+        # Cada turno es un par (usuario, modelo) => 2 mensajes
+        trimmed_history = chat_history[-(2 * max_turns):]
+
+        for msg in trimmed_history:
             if msg["type"] == "human":
                 formatted_history.append(HumanMessage(content=msg["content"]))
             elif msg["type"] in ["ai", "assistant"]:
@@ -76,3 +84,4 @@ def answer_question(question: str, chat_history: list = None):
     })
 
     return result["answer"] if "answer" in result else result
+
